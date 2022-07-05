@@ -84,7 +84,8 @@ class TransactionSimulator():
         self.transactions["success"] = self.transactions["transaction_id"].apply(lambda x: x in success_tx_ids)
         print("Transactions simulated on original graph DONE")
         print("Transaction succes rate:")
-        print(self.transactions["success"].value_counts() / len(self.transactions))
+        success_rate = self.transactions["success"].value_counts() / len(self.transactions)
+        print(success_rate)
         if self.verbose:
             print("Length distribution of optimal paths:")
             print(shortest_paths["length"].value_counts())
@@ -101,7 +102,8 @@ class TransactionSimulator():
         self.shortest_paths = shortest_paths
         self.alternative_paths = alternative_paths
         self.all_router_fees = all_router_fees
-        return shortest_paths, alternative_paths, all_router_fees, total_depletions
+        max_num_trans = get_max_num_trans(self.all_router_fees)
+        return shortest_paths, alternative_paths, all_router_fees, total_depletions, success_rate, max_num_trans
     
     def export(self, output_dir):
         if not os.path.exists(output_dir):
@@ -117,7 +119,18 @@ class TransactionSimulator():
         print("Export DONE")
         return total_income, total_fee
     
+    def mean_fee_for_sources(self):
+        df_total_fee = get_total_fee_for_sources(self.transactions, self.shortest_paths)
+        mean_fee = df_total_fee['mean_fee'].sum() / len(df_total_fee)
+        mean_fee = round(mean_fee, 2)
+        return mean_fee
+    
 ### process results ###
+
+def get_max_num_trans(all_router_fees):
+    grouped = all_router_fees.groupby("node")
+    aggr_router_income = grouped.agg({"fee":"sum","transaction_id":"count"}).reset_index().sort_values("transaction_id",ascending=False)
+    return aggr_router_income.rename({"transaction_id":"num_trans"}, axis=1)
 
 def get_total_income_for_routers(all_router_fees):
     grouped = all_router_fees.groupby("node")
